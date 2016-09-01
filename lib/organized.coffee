@@ -5,6 +5,7 @@ Table = require './table'
 Todo = require './todo'
 CodeBlock = require './codeblock'
 OrganizedToolbar = require './toolbar'
+SidebarView = require './sidebar-view'
 
 module.exports =
   organizedView: null
@@ -13,12 +14,13 @@ module.exports =
   levelStyle: 'spaces'
   indentSpaces: 2
   createStarsOnEnter: true
-  lineUpNewTextLinesUnderTextNotStar: true
   autoSizeTables: true
   organizedToolbar: null
 
   config:
     levelStyle:
+      title: 'Level Style'
+      description: 'If you indent a star/bullet point, how should it be indented by default?'
       type: 'string'
       default: 'spaces'
       enum: [
@@ -34,10 +36,6 @@ module.exports =
       type: 'boolean'
       default: true
 
-    lineUpNewTextLinesUnderTextNotStar:
-      type: 'boolean'
-      default: true
-
     autoSizeTables:
       type: 'boolean'
       default: false
@@ -47,6 +45,22 @@ module.exports =
       type: 'boolean'
       default: true
       description: "Show a toolbar using the tool-bar package if that package is installed"
+
+    searchDirectories:
+      type: 'array'
+      title: 'Organized File Directories'
+      description: 'Directories where we will look for organized files when building todo lists, agendas, or searching'
+      default: ['','','','','']
+      items:
+        type: 'string'
+
+    searchSkipFiles:
+      type: 'array'
+      title: 'Organized Partial File Names to Skip'
+      description: 'A list of partial file names to skip'
+      default: ['', '', '', '', '']
+      items:
+        type: 'string'
 
   activate: (state) ->
     atom.themes.requireStylesheet(require.resolve('../styles/organized.less'));
@@ -93,12 +107,13 @@ module.exports =
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:findTodos': (event) => Todo.findInDirectories() }))
 
     @subscriptions.add atom.config.observe 'organized.autoCreateStarsOnEnter', (newValue) => @createStarsOnEnter = newValue
-    @subscriptions.add atom.config.observe 'organized.lineUpNewTextLinesUnderTextNotStar', (newValue) => @lineUpNewTextLinesUnderTextNotStar = newValue
     @subscriptions.add atom.config.observe 'organized.levelStyle', (newValue) => @levelStyle = newValue
     @subscriptions.add atom.config.observe 'editor.tabLength', (newValue) => @indentSpaces = newValue
     @subscriptions.add atom.config.observe 'organized.autoSizeTables', (newValue) => @autoSizeTables = newValue
 
     @organizedToolbar.activate(@subscriptions)
+
+    @sidebar = new SidebarView()
 
   closeTable: (event) ->
     if editor = atom.workspace.getActiveTextEditor()

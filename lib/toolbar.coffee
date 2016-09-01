@@ -1,5 +1,5 @@
 {Disposable} = require 'atom'
-# deps = require('atom-package-deps')
+deps = require('atom-package-deps')
 
 #
 # Create a toolbar based on the tool-bar package.  We don't install the
@@ -141,11 +141,11 @@ class OrganizedToolbar
     if not atom.packages.getLoadedPackage('tool-bar')
       atom.notifications.addWarning("tool-bar is not installed.  Please install it to see a tool-bar.")
       atom.config.set('organized.enableToolbarSupport', true)
-      # deps.install()
-      #   .then () =>
-      #     @addToolbar
-      #   .catch (e) =>
-      #     console.log(e)
+      deps.install()
+        .then () =>
+          @addToolbar
+        .catch (e) =>
+          console.log(e)
       return
 
     if not atom.config.get('organized.enableToolbarSupport') or not @enabled

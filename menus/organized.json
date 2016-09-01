@@ -1,20 +1,4 @@
 {
-  "context-menu": {
-    "atom-text-editor": [
-      {
-        "label": "Todo Item Toggle (todo/completed/unmarked)",
-        "command": "organized:toggleTodo"
-      },
-      {
-        "label": "Indent",
-        "command": "organized-mode:indent"
-      },
-      {
-        "label": "Unindent",
-        "command": "organized-mode:unindent"
-      }
-    ]
-  },
   "menu": [
     {
       "label": "Packages",
@@ -23,8 +7,8 @@
           "label": "Organized",
           "submenu": [
             {
-              "label": "Toggle Organized Toolbar",
-              "command": "organized:toggleToolbar"
+              "label": "Toggle Organized Sidebar",
+              "command": "organized:toggleSidebar"
             },
             {
               "label": "Todo Item Toggle (todo/completed/unmarked)",

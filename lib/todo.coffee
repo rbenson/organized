@@ -11,11 +11,10 @@ class Todo
     @text = text
 
   @findInDirectories: (directories = atom.project.getPaths(), onComplete) ->
-    @_findInDirectories directories, [], (todos) ->
-        for todo in todos
-          console.log("#{todo.file}:#{todo.line} #{todo.text}")
+    skipFiles = atom.config.get('organized.searchSkipFiles')
+    @_findInDirectories directories, skipFiles, [], onComplete
 
-  @_findInDirectories: (directories, todos, onComplete) ->
+  @_findInDirectories: (directories, skipFiles, todos, onComplete) ->
     if directories.length is 0
       onComplete(todos)
     else
@@ -23,7 +22,18 @@ class Todo
       TextSearch.findAsPromise("(\\[TODO\\].*)$", "**/*.org", {cwd: path})
         .then (results) =>
           for result in results
-            todos.push(new Todo(path + "/" + result.file, result.line, result.text))
-          @_findInDirectories(directories, todos, onComplete)
+            skip = false
+            for partial in skipFiles
+              if result.file.indexOf(partial) > -1
+                skip = true
+                break;
+            if skip
+              continue
+
+            text = result.text
+            if match = result.text.match(/(\[TODO\])\s+(.*)$/)
+                text = match[2]
+            todos.push(new Todo(path + "/" + result.file, result.line, text))
+          @_findInDirectories(directories, skipFiles, todos, onComplete)
 
 module.exports = Todo

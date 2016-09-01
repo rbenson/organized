@@ -4,6 +4,38 @@
 // for a full listing of what's available.
 @import "ui-variables";
 
+atom-panel {
+  div.organized-sidebar-todo {
+    div.organized-sidebar-todo-header {
+      position: relative;
+      min-width: 350px;
+
+      h1 {
+        // float: left;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+
+      span.close-button {
+        // float: right;
+        position: absolute;
+        top: 0;
+        right: 0;
+        font-size: 24pt;
+      }
+    }
+
+    div.organized-sidebar-todo-items {
+      ul.organized-sidebar-todo-list {
+        li {
+          text-overflow:ellipsis;
+        }
+      }
+    }
+  }
+}
+
 atom-text-editor, atom-text-editor::shadow {
   .organized {
     .header.level1.symbol, .header.level1.line {

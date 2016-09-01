@@ -67,8 +67,16 @@
   * [TODO] Key-command to increase / decrease priority of items
   * [COMPLETED] Support multiple cursors for TODO toggling.
   * [TODO] Command to remove completed todos from current file
-  * [TODO] UI for all TODO's in directory
-  * [TODO] Configuration to show what directories we'll scan for TODO items
+  * Todos for SidePanel
+    * [TODO] UI for all TODO's in directory
+    * [TODO] Configuration to show what directories we'll scan for TODO items
+    * [COMPLETED] Click-through from TODO to source code location
+    * [TODO] Checkboxes on the todo item to automatically mark it as completed
+    * [TODO] Hierarchical todos
+    * [TODO] Filter Todo by tag
+    * [TODO] Nice Styling for todo
+    * [TODO] Refresh button for todo items
+    * [TODO] Automatically refresh todo items
   * [TODO] Setting to auto-hide completed todo items
   * Figure out how to model the storage of TODO items
     * We should probably model parent-child relationship (parent outline node is a todo and it has children
