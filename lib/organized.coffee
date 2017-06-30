@@ -1,10 +1,16 @@
 {CompositeDisposable, Directory, Point} = require 'atom'
+fs = require 'fs'
+{dialog} = require('electron')
+moment = require 'moment'
+
+CodeBlock = require './codeblock'
+#GoogleCalendar = require './google-calendar'
+OrganizedToolbar = require './toolbar'
 OrganizedView = require './organized-view'
+SidebarView = require './sidebar-view'
 Star = require './star'
 Table = require './table'
-Todo = require './todo'
-CodeBlock = require './codeblock'
-OrganizedToolbar = require './toolbar'
+Todo = require './sidebar-items'
 
 module.exports =
   organizedView: null
@@ -13,40 +19,66 @@ module.exports =
   levelStyle: 'spaces'
   indentSpaces: 2
   createStarsOnEnter: true
-  lineUpNewTextLinesUnderTextNotStar: true
   autoSizeTables: true
   organizedToolbar: null
+  useBracketsAroundTodoTags: true
 
   config:
     levelStyle:
+      title: 'Level Style'
+      description: 'If you indent a star/bullet point, how should it be indented by default?'
       type: 'string'
-      default: 'spaces'
+      default: 'whitespace'
       enum: [
-        {value: 'spaces', description: 'Sublevels are created by putting spaces in front of the stars'}
-        {value: 'tabs', description: 'Sublevels are created by putting tabs in front of the stars'}
+        {value: 'whitespace', description: 'Sublevels are created by putting spaces or tabs (based on your editor tabType setting) in front of the stars'}
         {value: 'stacked', description: 'Sublevels are created using multiple stars.  For example, level three of the outline would start with ***'}
       ]
-    indentSpaces:
-      type: 'integer'
-      default: 2
 
     autoCreateStarsOnEnter:
       type: 'boolean'
       default: true
 
-    lineUpNewTextLinesUnderTextNotStar:
+    useBracketsAroundTodoTags:
       type: 'boolean'
       default: true
+      description: "When created TODO or DONE tags, prefer [TODO] over TODO and [DONE] over DONE"
 
     autoSizeTables:
       type: 'boolean'
       default: false
-      description: "If you are typing in a table, automatically resize the columns so your text fits."
+      description: "(Not Ready for Prime Time) If you are typing in a table, automatically resize the columns so your text fits."
 
     enableToolbarSupport:
       type: 'boolean'
       default: true
       description: "Show a toolbar using the tool-bar package if that package is installed"
+
+    searchDirectories:
+      type: 'array'
+      title: 'Predefined search directories / files'
+      description: 'Directories and/or files where we will look for organized files when building todo lists, agendas, or searching.  Separate multiple files or directories with a comma'
+      default: ['','','','','']
+      items:
+        type: 'string'
+
+    includeProjectPathsInSearchDirectories:
+      type: 'boolean'
+      default: true
+      description: 'Indicates whether we should include the paths for the current project in the search directories'
+
+    searchSkipFiles:
+      type: 'array'
+      title: 'Organized Partial File Names to Skip'
+      description: 'A list of partial file names to skip'
+      default: ['', '', '', '', '']
+      items:
+        type: 'string'
+
+    sidebarVisible:
+      type: 'boolean'
+      title: "Show Sidebar"
+      description: "Sidebar is currently being shown"
+      default: false
 
   activate: (state) ->
     atom.themes.requireStylesheet(require.resolve('../styles/organized.less'));
@@ -58,16 +90,19 @@ module.exports =
       })
 
     @subscriptions = new CompositeDisposable()
-    if not @organizedToolbar
-      @organizedToolbar = new OrganizedToolbar()
 
     # Set up text editors
     @subscriptions.add atom.workspace.observeTextEditors (editor) =>
       @handleEvents(editor)
+      @subscriptions.add editor.onDidSave =>
+        if @sidebar and @sidebar.sidebarVisible and editor.getGrammar().name is 'Organized'
+          @sidebar.refreshAll()
 
     # Register command that toggles this view
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:indent': (event) => @indent(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:unindent': (event) => @unindent(event) }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:setTodo': (event) => @setTodo(event) }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:setTodoCompleted': (event) => @setTodoCompleted(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:toggleTodo': (event) => @toggleTodo(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:newLine': (event) => @newLine(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:newStarLine': (event) => @newStarLine(event) }))
@@ -80,7 +115,7 @@ module.exports =
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:insertDate': (event) => @insert8601Date(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:insertDateTime': (event) => @insert8601DateTime(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:executeCodeBlock': (event) => @executeCodeBlock(event) }))
-    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:encryptBuffer': (event) => @encryptBuffer(event) }))
+    #@subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:encryptBuffer': (event) => @encryptBuffer(event) }))
 
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:toggleBold': (event) => @toggleBold(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:toggleUnderline': (event) => @toggleUnderline(event) }))
@@ -90,15 +125,37 @@ module.exports =
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:makeResultBlock': (event) => @makeResultBlock(event) }))
     @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:makeLink': (event) => @makeLink(event) }))
 
-    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:findTodos': (event) => Todo.findInDirectories() }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:refreshTodos': (event) => @sidebar.refreshTodos() }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:refreshAgenda': (event) => @sidebar.refreshAgendaItems() }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:scheduleItem': (event) => @scheduleItem(event) }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:deadlineItem': (event) => @deadlineItem(event) }))
+
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:archiveSubtree': (event) => @archiveSubtree(event) }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:archiveToClipboard': (event) => @archiveToClipboard(event) }))
+    #@subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:importTodaysEvents': (event) => GoogleCalendar.importTodaysEvents() }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:increasePriority': (event) => @increasePriority(event) }))
+    @subscriptions.add(atom.commands.add('atom-text-editor', { 'organized:decreasePriority': (event) => @decreasePriority(event) }))
 
     @subscriptions.add atom.config.observe 'organized.autoCreateStarsOnEnter', (newValue) => @createStarsOnEnter = newValue
-    @subscriptions.add atom.config.observe 'organized.lineUpNewTextLinesUnderTextNotStar', (newValue) => @lineUpNewTextLinesUnderTextNotStar = newValue
     @subscriptions.add atom.config.observe 'organized.levelStyle', (newValue) => @levelStyle = newValue
-    @subscriptions.add atom.config.observe 'editor.tabLength', (newValue) => @indentSpaces = newValue
     @subscriptions.add atom.config.observe 'organized.autoSizeTables', (newValue) => @autoSizeTables = newValue
+    @subscriptions.add atom.config.observe 'editor.tabLength', (newValue) => @indentSpaces = newValue
+    @subscriptions.add atom.config.observe 'organized.useBracketsAroundTodoTags', (newValue) => @useBracketsAroundTodoTags = newValue
 
-    @organizedToolbar.activate(@subscriptions)
+    @sidebar = new SidebarView()
+    @sidebar.activate(@subscriptions)
+
+    if not @organizedToolbar
+      @organizedToolbar = new OrganizedToolbar()
+      @organizedToolbar.activate(@subscriptions)
+      @organizedToolbar.setSidebar(@sidebar)
+
+  archiveSubtree: (event) ->
+    @_archiveSubtree(false)
+
+  archiveToClipboard: (event) ->
+    archiveText = @_archiveSubtree(true)
+    atom.clipboard.write(archiveText)
 
   closeTable: (event) ->
     if editor = atom.workspace.getActiveTextEditor()
@@ -113,16 +170,20 @@ module.exports =
           line = editor.lineTextForBufferRow(position.row-1)
           editor.setTextInBufferRange([[position.row, 0], [position.row, position.column]], "")
 
-        startMatch = /^(?<=\s*)[\|\+]/.exec(line)
-        endMatch = /[\|\+](?=\s*$)/.exec(line)
+        startMatch = /^(\s*)[\|\+]/.exec(line)
+        endMatch = /[\|\+](\s*$)/.exec(line)
         if startMatch and endMatch
           # console.log("startMatch: #{startMatch}, endMatch: #{endMatch}")
-          editor.insertText("+#{'-'.repeat(endMatch.index-startMatch.index-1)}+")
+          dashCount = endMatch.index-startMatch.index-startMatch[0].length
+          editor.insertText("+#{'-'.repeat(dashCount)}+")
 
   # Callback from tool-bar to create a toolbar
   consumeToolBar: (toolBar) ->
     if not @organizedToolbar
       @organizedToolbar = new OrganizedToolbar()
+      @organizedToolbar.activate(@subscriptions)
+      @organizedToolbar.setSidebar(@sidebar)
+
     @organizedToolbar.consumeToolBar(toolBar)
 
   # Create a skeleton of a table ready for a user to start typing in it.
@@ -146,6 +207,12 @@ module.exports =
     @subscriptions.dispose()
     @organizedView.destroy()
 
+  deadlineItem: (event) ->
+    @_addMarkerDate("DEADLINE")
+
+  decreasePriority: () ->
+    @_changePriority(false)
+
   executeCodeBlock: () ->
     if editor = atom.workspace.getActiveTextEditor()
       if position = editor.getCursorBufferPosition()
@@ -155,8 +222,8 @@ module.exports =
         atom.notifications.error("Unable to find code block")
 
   handleEvents: (editor) ->
-    # tableChangeSubscription = editor.onDidChange (event) =>
-    #   @tableChange(event)
+    tableChangeSubscription = editor.onDidChange (event) =>
+      @tableChange(event)
     tableStoppedChangingSub = editor.onDidStopChanging (event) =>
       @tableStoppedChanging(event)
     editorDestroySubscription = editor.onDidDestroy =>
@@ -165,6 +232,9 @@ module.exports =
     # @subscriptions.add(tableChangeSubscription)
     @subscriptions.add(tableStoppedChangingSub)
     @subscriptions.add(editorDestroySubscription)
+
+  increasePriority: () ->
+    @_changePriority(true)
 
   indent: (event) ->
     if editor = atom.workspace.getActiveTextEditor()
@@ -178,7 +248,7 @@ module.exports =
             for i in [star.startRow..star.endRow]
               visited[i] = true
 
-            indent = if @levelStyle is "stacked" then star.starType else @_indentChars()
+            indent = if star.indentType is "stacked" then star.starType else @_indentChars()
             for row in [star.startRow..star.endRow]
               editor.setTextInBufferRange([[row, 0], [row, 0]], indent)
           else
@@ -242,7 +312,9 @@ module.exports =
       if star = @_starInfo()
         editor.transact 1000, () =>
           editor.insertNewline()
-          indent = @_indentChars().repeat(star.indentLevel) + "  "
+          spaceCount = star.startTodoCol - star.starCol
+          indent = @_levelWhitespace(star, editor).repeat(star.indentLevel) + " ".repeat(spaceCount)
+          # console.log("spaceCount: #{spaceCount}, indentLevel: #{star.indentLevel}, levelWhiteSpace='#{@_levelWhitespace(star, editor)}'")
           newPosition = editor.getCursorBufferPosition()
           editor.transact 1000, () =>
             editor.setTextInBufferRange([[newPosition.row, 0],[newPosition.row, newPosition.column]], indent)
@@ -293,7 +365,7 @@ module.exports =
         oldStar = star
         if oldPosition.row+1 <= editor.getLastBufferRow()
           if nextStar = @_starInfo(editor, new Point(oldPosition.row+1, oldPosition.col))
-            if nextStar.indentLevel > star.indentLevel
+            if not star or nextStar.indentLevel > star.indentLevel
               star = nextStar
 
         if star and star.indentLevel >= 0
@@ -351,39 +423,61 @@ module.exports =
       organizedViewState: @organizedView.serialize()
     }
 
+  scheduleItem: (event) ->
+    @_addMarkerDate("SCHEDULED")
+
+  setTodo: (event) ->
+    if editor = atom.workspace.getActiveTextEditor()
+      visited = {}
+      startPosition = editor.getCursorBufferPosition()
+      startRow = startPosition.row
+
+      @_withAllSelectedLines editor, (position, selection) =>
+        if visited[position.row]
+          return
+
+        if star = @_starInfo(editor, position)
+          for i in [star.startRow..star.endRow]
+            visited[i] = true
+
+          line = editor.lineTextForBufferRow(star.startRow)
+          editor.setTextInBufferRange([[star.startRow, star.startTodoCol], [star.startRow, star.startTextCol]], " [TODO] ")
+
+  setTodoCompleted: (event) ->
+    if editor = atom.workspace.getActiveTextEditor()
+      visited = {}
+      startPosition = editor.getCursorBufferPosition()
+      startRow = startPosition.row
+
+      @_withAllSelectedLines editor, (position, selection) =>
+        if visited[position.row]
+          return
+
+        if star = @_starInfo(editor, position)
+          for i in [star.startRow..star.endRow]
+            visited[i] = true
+
+          line = editor.lineTextForBufferRow(star.startRow)
+          editor.setTextInBufferRange([[star.startRow, star.whitespaceCol], [star.startRow, star.startTextCol]], " [DONE] ")
+
   tableChange: (event) ->
     if not @autoSizeTables
       return
 
     if editor = atom.workspace.getActiveTextEditor()
-      if 'row.table.organized' in editor.getLastCursor().getScopeDescriptor().getScopesArray()
+      scopes = editor.getLastCursor().getScopeDescriptor().getScopesArray()
+      if 'row.table.organized' in scopes or 'border.table.organized' in scopes
         table = new Table(editor)
         return unless table.found?
-        columns = table.findRowColumns()
-        return unless columns?
-
-        column = table.currentColumnIndex(columns)
-        #Add to end of column so spaces in a table column don't look weird
-        indentColumn = columns[column+1]-1
-        position = editor.getCursorBufferPosition()
-        for row in [table.firstRow..table.lastRow]
-          console.log("Row: #{row}, position.row: #{position.row}")
-          if row is position.row
-            continue
-          position = [row, indentColumn]
-          scopes = editor.scopeDescriptorForBufferPosition(position).getScopesArray()
-          console.log(scopes)
-          if 'border.table.organized' in scopes
-            editor.setTextInBufferRange([[row, indentColumn],[row, indentColumn]], "-")
-          else if 'row.table.organized' in scopes
-            editor.setTextInBufferRange([[row, indentColumn],[row, indentColumn]], " ")
+        # Getting closer, but not there yet.
+        #table.normalizeRowSizes()
 
   tableStoppedChanging: (event) ->
     return unless @autoSizeTables
-    if editor = atom.workspace.getActiveTextEditor()
-      scopes = editor.getLastCursor().getScopeDescriptor().getScopesArray()
-      if 'row.table.organized' in scopes or 'border.table.organized' in scopes
-        console.log(event)
+    # if editor = atom.workspace.getActiveTextEditor()
+    #   scopes = editor.getLastCursor().getScopeDescriptor().getScopesArray()
+    #   if 'row.table.organized' in scopes or 'border.table.organized' in scopes
+    #     console.log("Stopped changing")
 
   toggleBold: (event) ->
     if editor = atom.workspace.getActiveTextEditor()
@@ -421,8 +515,7 @@ module.exports =
             editor.setTextInBufferRange([[position.row, 0], [position.row, charsToDelete]], '')
 
   toggleTodo: (event) ->
-    editor = atom.workspace.getActiveTextEditor()
-    if editor
+    if editor = atom.workspace.getActiveTextEditor()
       visited = {}
       startPosition = editor.getCursorBufferPosition()
       startRow = startPosition.row
@@ -436,14 +529,14 @@ module.exports =
             visited[i] = true
 
           line = editor.lineTextForBufferRow(star.startRow)
-          if (line.match(/\s*([\-\+\*]+|\d+.) \[TODO\] /))
-            deleteStart = line.indexOf("[TODO] ")
-            editor.setTextInBufferRange([[star.startRow, deleteStart], [star.startRow, deleteStart+7]], "[COMPLETED] ")
-          else if (line.match(/\s*([\-\+\*]+|\d+.) \[COMPLETED\] /))
-            deleteStart = line.indexOf("[COMPLETED] ")
-            editor.setTextInBufferRange([[star.startRow, deleteStart], [star.startRow, deleteStart+12]], "")
+          if match = line.match(/\s*([\-\+\*]+|\d+.) (\[(TODO)\]|\wTODO\w) /)
+            replacement = if match[2].includes('[') then " [DONE] " else " DONE "
+            editor.setTextInBufferRange([[star.startRow, star.whitespaceCol], [star.startRow, star.startTextCol]], replacement)
+          else if (line.match(/\s*([\-\+\*]+|\d+.) ((\[(COMPLETED|DONE)\])|\w(COMPLETED|DONE)\w) /))
+            editor.setTextInBufferRange([[star.startRow, star.whitespaceCol], [star.startRow, star.startTextCol]], " ")
           else
-            editor.setTextInBufferRange([[star.startRow, star.whitespaceCol], [star.startRow, star.whitespaceCol]], " [TODO]")
+            replacement = if @useBracketsAroundTodoTags then " [TODO] " else " TODO "
+            editor.setTextInBufferRange([[star.startRow, star.whitespaceCol], [star.startRow, star.startTextCol]], replacement)
 
   toggleUnderline: (event) ->
     if editor = atom.workspace.getActiveTextEditor()
@@ -486,7 +579,9 @@ module.exports =
             editor.transact 1000, () ->
               for row in [firstRow..lastRow]
                 line = editor.lineTextForBufferRow(row)
-                if line.match("^  ")
+                if not line
+                  continue
+                else if line.match("^  ")
                   editor.setTextInBufferRange([[row, 0], [row, 2]], "")
                 else if line.match("^\\t")
                   editor.setTextInBufferRange([[row, 0], [row, 1]], "")
@@ -499,6 +594,144 @@ module.exports =
                   #cannot unindent - not sure how to do so
           else
             editor.outdentSelectedRows()
+
+  _addMarkerDate: (dateType) ->
+    if editor = atom.workspace.getActiveTextEditor()
+      visited = {}
+      d = new Date()
+      df = new Intl.DateTimeFormat('en-US', {weekday: 'short'})
+      dow = df.format(d)
+      @_withAllSelectedLines editor, (position, selection) =>
+          if visited[position.row]
+            return
+
+          if star = @_starInfo(editor, position)
+            for i in [star.startRow..star.endRow]
+              visited[i] = true
+
+            editor.transact 1000, () =>
+              originalPosition = editor.getCursorBufferPosition()
+
+              # Now add the marker
+              newText = "\n" + " ".repeat(star.startTodoCol) + "#{dateType}: <#{@_getISO8601Date(d)} #{dow}>"
+              col = editor.lineTextForBufferRow(star.startRow).length
+              editor.setTextInBufferRange([[star.startRow, col+1], [star.startRow, col+1]], newText)
+
+  _archiveSubtree: (outputToString) ->
+    if editor = atom.workspace.getActiveTextEditor()
+      visited = {}
+
+      baseArchiveLevel = null
+      stars = []
+
+      # If there are multiple selections, this could span multiple subtrees.  Calculate
+      # the total size of the tree first.  One possible problem is that we aren't going
+      # to have properties for each of the subtrees when we archive.
+      @_withAllSelectedLines editor, (position, selection) =>
+        if visited[position.row]
+          return
+
+        # Mark all lines in subtree as visited
+        visited[position.row] = true
+
+        if not star = @_starInfo(editor, position)
+          return
+
+        # Capture the first star, so we know how deeply to indent the properties
+        if not baseArchiveLevel
+          baseArchiveLevel = star.indentLevel
+
+        if star.indentLevel == baseArchiveLevel
+          # We need to put properties on this level too, otherwise we won't be able to unarchive it.
+          stars.push(star)
+
+        endOfSubtree = star.getEndOfSubtree()
+        for line in [star.startRow..endOfSubtree]
+          visited[line] = true
+
+      # Now act on those lines
+      editor.transact 2000, () =>
+        textToInsertIntoArchiveFile = ""
+        rangeToDelete = null
+
+        # Iterate backwards so we don't change the line number of stars.
+        # Collect the text to delete and the ranges that we are deleting.
+        for star in stars by -1
+          startOfSubtree = star.startRow
+          endOfSubtree = star.getEndOfSubtree()
+          startTodoCol = star.startTodoCol
+
+          # Be careful to support selecting out of the end of a file
+          if endOfSubtree == editor.getLastBufferRow()
+            lastCol = editor.lineTextForBufferRow(endOfSubtree).length
+          else
+            endOfSubtree += 1
+            lastCol = 0
+
+          archiveText = editor.lineTextForBufferRow(startOfSubtree) + '\n'
+          archiveText += ' '.repeat(startTodoCol) + ':PROPERTIES:' + '\n'
+          archiveText += ' '.repeat(startTodoCol) + ':ARCHIVE_TIME: ' + moment().format('YYYY-MM-DD ddd HH:mm') + '\n'
+          if path = editor.getPath()
+            archiveText += ' '.repeat(startTodoCol) + ':ARCHIVE_FILE: ' + path + "\n"
+          archiveText += ' '.repeat(startTodoCol) + ':END:' + "\n"
+
+          # If end is the same as the beginning, we've already gotten all of the text
+          if endOfSubtree > startOfSubtree
+            archiveText += editor.getTextInBufferRange([[startOfSubtree+1, 0], [endOfSubtree, lastCol]])
+
+          if textToInsertIntoArchiveFile isnt ''
+            textToInsertIntoArchiveFile = archiveText + textToInsertIntoArchiveFile
+          else
+            textToInsertIntoArchiveFile = archiveText
+
+          starRangeToDelete = [[startOfSubtree, 0], [endOfSubtree, lastCol]]
+
+          # Increase the total range we are deleting to encompass this star too
+          if not rangeToDelete
+            rangeToDelete = starRangeToDelete
+          # Is this later than our selection to delete?
+          if starRangeToDelete[1][0] > rangeToDelete[1][0]
+            rangeToDelete[1] = starRangeToDelete[1]
+          # Is this earlier than our earliest selection to delete?
+          if starRangeToDelete[0][0] < rangeToDelete[0][0]
+            rangeToDelete[0] = starRangeToDelete[0]
+
+        # If there is actually something to archive, do that now
+        if rangeToDelete
+          if outputToString
+            editor.setTextInBufferRange(rangeToDelete, '')
+            return textToInsertIntoArchiveFile.trimLeft()
+          else
+            if not archiveFilename = editor.getPath() + '_archive'
+              archiveFilename = dialog.showSaveDialog({title: 'Archive filename', message: 'Choose the file where this content will be moved to'})
+              if not archiveFilename
+                return
+
+            fs.stat archiveFilename, (err, stat) ->
+              if err == fs.ENOENT or stat.size == 0
+                textToInsertIntoArchiveFile = textToInsertIntoArchiveFile.trimLeft()
+              fs.appendFile archiveFilename, textToInsertIntoArchiveFile, (err) ->
+                if err
+                  atom.notifications.addError("Unable to archive content due to error: " + err)
+                else
+                  editor.setTextInBufferRange(rangeToDelete, '')
+
+  _changePriority: (up) ->
+    if editor = atom.workspace.getActiveTextEditor()
+      visited = {}
+      editor.transact 1000, () =>
+        @_withAllSelectedLines editor, (position, selection) =>
+          if visited[position.row]
+            return
+
+          if star = @_starInfo(editor, position)
+            for i in [star.startRow..star.endRow]
+              visited[i] = true
+
+            if up
+              star.increasePriority(editor)
+            else
+              star.decreasePriority(editor)
 
   _getISO8601Date: (date) ->
     year = ("0000" + date.getFullYear()).substr(-4, 4)
@@ -525,8 +758,10 @@ module.exports =
     "" + hours + ":" + minutes + ":" + seconds + offsetString
 
   _indentChars: (star=null, editor=atom.workspace.getActiveTextEditor(), position=editor.getCursorBufferPosition()) ->
-    if star and star.indentType isnt "mixed"
+    if star and star.indentType isnt "mixed" and star.indentType isnt "none"
       indentStyle = star.indentType
+    else if @levelStyle is "whitespace"
+      indentStyle = if editor.getSoftTabs() then "spaces" else "tabs"
     else
       indentStyle = @levelStyle
 
@@ -538,6 +773,20 @@ module.exports =
       if not star
         star = @_starInfo()
       indent = star.starType
+
+    return indent
+
+  _levelWhitespace: (star=null, editor=atom.workspace.getActiveTextEditor()) ->
+    if not star
+      star = @_starInfo(editor)
+
+    # console.log("star: #{star}, indentType: #{star.indentType}, softTabs: #{editor.getSoftTabs()}")
+    if star and star.indentType is "stacked"
+      indent = ""
+    else if editor.getSoftTabs()
+      indent = " ".repeat(@indentSpaces)
+    else
+      indent = "\t"
 
     return indent
 
@@ -566,7 +815,7 @@ module.exports =
   _withAllSelectedLines: (editor, callback) ->
     editor = atom.workspace.getActiveTextEditor() unless editor
 
-    if editor = atom.workspace.getActiveTextEditor()
+    if editor
       selections = editor.getSelections()
       for selection in selections
         range = selection.getBufferRange()

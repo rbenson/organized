@@ -24,9 +24,9 @@ class CodeBlock
       row -= 1
       line = editor.lineTextForBufferRow(row)
 
-    if match = /(?<=^\s*)(```|#\+BEGIN_SRC )(\S+)/.exec(line)
+    if match = /(^\s*)(```|#\+BEGIN_SRC )(\S+)/.exec(line)
       @startRow = row
-      @language = match[2]
+      @language = match[3]
       @startCol = match.index
     else
       return
@@ -75,6 +75,8 @@ class CodeBlock
       filename = tmp.tmpNameSync({dir: dirname}) + ".c"
     else if @language is 'cpp'
       filename = tmp.tmpNameSync({dir: dirname}) + ".cpp"
+    else if @language in ['go', 'golang']
+      filename = tmp.tmpNameSync({dir: dirname}) + ".go"
     else if @language is 'objc'
       filename = tmp.tmpNameSync({dir: dirname}) + ".m"
     else
@@ -141,6 +143,14 @@ class CodeBlock
           else
             return spawn(outputFile)
 
+      # I can't figure out how the 'or' syntax works in coffeescript, I'll just leave two copies for now
+      # because they are short.
+      when 'go' then return (pathToFile, resultBlock) ->
+        return spawn('go', ['run', pathToFile])
+
+      when 'golang' then return (pathToFile, resultBlock) ->
+        return spawn('go', ['run', pathToFile])
+
       when 'java' then return (pathToFile, resultBlock) ->
         if match = pathToFile.match(/^(.*)\/([^/]+).java$/)
           dirName = match[1]
@@ -183,6 +193,9 @@ class CodeBlock
       when 'python' then return (pathToFile, resultBlock) ->
           return spawn('python', [pathToFile])
 
+      when 'r' then return (pathToFile, resultBlock) ->
+          return spawn('Rscript', [pathToFile])
+
       when 'shell' then return (pathToFile, resultBlock) ->
         return spawn('sh', [pathToFile])
 
@@ -199,6 +212,10 @@ class ResultBlock
     row = codeBlock.endRow+1
     line = editor.lineTextForBufferRow(row)
     while row < editor.getLastBufferRow() and not line.match(/^\s*(#\+RESULT|```result)/)
+      if line.match(/^\s*(```|#BEGIN_SRC)/)
+        #Another code block is starting.  Our code block must not have one.
+        return
+
       row += 1
       line = editor.lineTextForBufferRow(row)
 
@@ -206,8 +223,6 @@ class ResultBlock
       @resultRow = row
       @indentCol = match.index
       line = editor.lineTextForBufferRow(row)
-
-    console.log("resultRow: #{@resultRow}")
 
   addError: (result) ->
     if not @resultRow

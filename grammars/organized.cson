@@ -2,6 +2,7 @@ scopeName: 'source.organized'
 name: 'Organized'
 fileTypes: [
   'org'
+  'org_archive'
   'organized'
 ]
 
@@ -47,8 +48,20 @@ repository:
         match: "\\[TODO\\]"
       },
       {
+        name: 'todo.organized'
+        match: "TODO"
+      },
+      {
         name: 'completed.organized'
-        match: "\\[COMPLETED\\]"
+        match: "\\[(COMPLETED|DONE)\\]"
+      },
+      {
+        name: 'completed.organized'
+        match: "COMPLETED|DONE"
+      },
+      {
+        name: 'priority.organized'
+        match: '\\[#[A-E]\\]'
       },
       {
         name: 'tags.organized'
@@ -142,6 +155,48 @@ repository:
             name: 'timeblock'
           5:
             name: 'endtimeblock'
+      },
+      {
+        name: 'deadline.meta'
+        match: "\s*(DEADLINE)(:) (\\<)([^\\>]+)(\\>)"
+        captures:
+          1:
+            name: 'tag'
+          2:
+            name: 'colon'
+          3:
+            name: 'begintimeblock'
+          4:
+            name: 'timeblock'
+          5:
+            name: 'endtimeblock'
+      }
+      {
+        name: 'closed.meta'
+        match: "\s*(CLOSED)(:) (\\[)([^\\>]+)(\\])"
+        captures:
+          1:
+            name: 'tag'
+          2:
+            name: 'colon'
+          3:
+            name: 'begintimeblock'
+          4:
+            name: 'timeblock'
+          5:
+            name: 'endtimeblock'
+      },
+      {
+        name: 'properties.block.organized'
+        begin: ':(PROPERTIES):'
+        contentName: 'properties.organized'
+        captures:
+          1:
+            name: 'properties.organized.blocktag'
+        end: ':(END):'
+        patterns: [
+          { include: '#propertieslist'}
+        ]
       },
       {
         name: 'c.code.block.organized'
@@ -341,6 +396,21 @@ repository:
         end: '```|#\\+END_SRC'
       },
       {
+        name: 'r.code.block.organized'
+        begin: '(```|#\\+BEGIN_SRC )(r|R)(\s|$)'
+        captures:
+          1:
+            name: 'code.block.tag.organized'
+          2:
+            name: 'code.block.language.organized'
+        contentName: "source.r"
+        patterns: [
+          { include: '#embedded-code' }
+          { include: 'source.r' }
+        ]
+        end: '```|#\\+END_SRC'
+      },
+      {
         name: 'ruby.code.block.organized'
         begin: '(```|#\\+BEGIN_SRC )(ruby)(\s|$)'
         captures:
@@ -384,6 +454,18 @@ repository:
           { include: 'source.sql' }
         ]
         end: '```|#\\+END_SRC'
+      }
+    ]
+  propertieslist:
+    patterns: [
+      {
+        name: 'property.organized'
+        match: '(:)([^:]+)(:)'
+        captures:
+          1:
+            name: 'property.symbol'
+          2:
+            name: 'property.name'
       }
     ]
   textcontent:

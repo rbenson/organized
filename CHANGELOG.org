@@ -1,3 +1,119 @@
+* 0.6.7 (Released 2017-05-09)
+  * Fixed bug that caused sidebar to be refreshed several times during startup.  This
+    slowed down startup and caused duplicates to show up in the agenda and todo items.
+  * Removed command that was accidentally included and not yet implemented.
+
+* 0.6.6 (Released 2017-03-23)
+  * Fixed another bug when inserting schedule markers
+
+* 0.6.5 (Released 2017-03-23)
+  * Fix off-by-one error when inserting schedule markers.
+
+* 0.6.4 (Released 2017-03-23)
+  * An errant space was causing an error on load.  Quick fix.
+
+* 0.6.3 (Released 2017-03-23)
+  * Implemented syntax coloring for todo priorities
+  * Todo Items are now sorted according to priority.  (Default priority is "C", range is A-E)
+  * Added keystrokes option-shift-up and option-shift-down to change priority of current item.  These should be
+    alt-shift-up and alt-shift-down on windows.
+  * Priority items in todo items
+  * Added syntax highlighting for deadlines
+  * Added keystrokes (ctrl-i d) to add a deadline.  Existing "insert date" functionality has been remapped to
+    (ctrl-i /)
+  * Deadlines are treated like schedule items (for now) in agendas
+
+* 0.6.2 (Released 2017-03-22)
+  * Even if sidebar is hidden, the toolbar button always said it was enabled.
+  * Archive used to only archive the current subtree and it ignored selections.  Now it archives the entire selection
+    too, even if it is multiple subtrees.
+  * Indicate in settings that multiple predefined directories should be separated with a comma.
+  * If there are links inside of an agenda or todo item, render them as hyperlinks
+  * If there is bold or underlined text in an agenda or todo item, render them.
+
+* 0.6.1 (Released 2017-03-18)
+  * Missed adding some files before I released, re-releasing.  This closes issue #14.
+
+* 0.6.0 (Released 2017-03-17)
+  * New Agenda sidebar panel
+  * Any item marked with a SCHEDULED tag later than or equal to the
+    start of today will show up in the Agenda Panel of the sidebar.
+  * New archive command (ctrl-i a) which moves the current subtree you are pointing to into a file named
+    <current-filename>_archive.  (For example, for TODO.org, it would be moved to TODO.org_archive)
+  * Archive files are now colored by org-mode as well.
+  * Stop using COMPLETED for todo items.  Instead use DONE.  Existing COMPLETED tags will continue to be colored
+    correctly.
+  * Don't require brackets around TODO items.
+  * Add a setting which asks whether we should use brackets around TODO or DONE by default
+
+* 0.5.8 (Released 2017-03-16)
+  * Fixed problem where completing a todo item from the sidebar would leave the TODO tag in place.
+  * Fixed problem where clicking on todo items in sidebar wouldn't bring you to the correct file if the file came
+    from the search path.
+  * Add key command to add a schedule completion date (default ctrl-i s), defaulting to today.  This should be
+    considered beta.
+
+* 0.5.7 (Released 2017-03-15)
+  * Fixed case where pressing enter on a non-star-line would cause an exception if the next line had a star.
+  * Fixed error leading to an empty sidebar when a predefined search file or directory does not exist.
+  * Added support for R-language for code blocks
+  * Fix deprecation warnings due to removal of Shadow DOM
+  * Fixed color coding for CLOSED and SCHEDULED tags.  (They haven't been working for quite a while.)
+  * Added golang support for code blocks
+  * Fix coloring for stars
+
+* 0.5.6 (Released 2016-03-15)
+  * This change was never officially released to the public and were rolled up into 0.5.7
+
+* 0.5.5 (Released 2016-11-30)
+  * Minor documentation improvements
+
+* 0.5.4 (Released 2016-11-29)
+  * Fixed ctrl-return indenting if you are making outlines or stacked symbols.  Previously this would always
+    indent two spaces, even though that wasn't right for those cases.
+  * Rethought the "organized.indentType" setting a bit.  Rather than specifying tabs or spaces directly, now
+    we'll use your editors normal setting (editor->tabType) instead.  This should make things work more
+    correctly by default for people that use tabs by default.
+  * As part of this rethinking, removed indentSpaces setting in favor of editor.tabLength setting.
+  * Fixed bug with indenting -- if a bullet character (-,+,*) were embedded in the middle of a line, we would not
+    indent that line along with the rest of your bullet.
+  * Modified the searchDirectories setting to allow setting files in addition to directories.
+  * Fixed bug preventing you from hitting return from the beginning of the second line of a section like this:
+    #Section
+    Some list:
+      1. One
+      2. Two
+      3. Three
+  * Fix table close command, which was erroring out due to a regex error.
+
+* 0.5.3 (Released 2016-11-18)
+  * Fix for Issue #7 - if a star is followed by a linebreak, that should be treated line a star too.
+  * Fix for Issue #8 - when indenting, try to detect indent type even if it is different from the default type
+  * Organized was not obeying the config setting for the number of spaces, it was only using the editor style.  Now
+    it should obey the config setting.
+
+* 0.5.2 (Released 2016-11-18)
+  * Fix for regular expression error.  (Thanks to John Kamenik for the PR!)
+
+* 0.5.1 (Release 2016-09-20)
+  * rbenson-patch-1 PR  (Thanks Ryan Benson for the PR!)
+
+* 0.5.0 (Released 2016-09-08)
+  * Added sidebar, which shows TODO's from all .org files in the current project.
+    * Use menus (Packages -> Organized) or the command organized:toggleSidebar
+      to toggle whether the menu appears.
+    * Todos can be marked as done by checking the checkbox next to them.
+    * Navigate to the source of the todo by clicking on the text.
+    * Refresh todos by clicking on the refresh button.  Todos are also refreshed
+      any time an organized file is saved.
+    * Added setting that allows additional directory names to be specified to scan.
+    * Added setting that allows you to exclude project directories from TODO scan.
+    * Added setting that allows certain files to be excluded.
+    * Added ability to resize sidebar
+    * Don't select text in sidebar while resizing.
+    * This feature is coming along, but is still in a fairly beta state.
+  * Fixed some toolbar quirkiness - should appear correctly now when enabled in settings.
+
 * 0.4.2 (Released 2016-09-01)
   * Fixed missing file preventing installation
 
@@ -6,6 +122,9 @@
     * Toolbar can be disabled through the organized setup, even if you have toolbar installed
     * Menu item installed to toggle the toolbar, which should raise the visibility that there is a toolbar.
   * Fix bug which caused 0.4.0 not to install correctly!
+  * Bug fixes
+    * Don't hijack result blocks from other code blocks.  Previously, if there were two code blocks and a result
+      block, executing the first code block would be the results in the result block.  Only the second one should.
 
 * 0.4.0 (Released 2016-08-31)
   * Support the "tool-bar" package for atom -- if it is installed, organized will have a toolbar with buttons for:

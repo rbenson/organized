@@ -3,7 +3,7 @@
 Organized is designed to allow you to keep notes, a schedule, and todo list
 inside of Atom.
 
-![Organized Screenshot](https://raw.githubusercontent.com/MattFlower/organized/master/screenshots/0_4_0.gif)
+![Organized Screenshot](https://raw.githubusercontent.com/MattFlower/organized/master/screenshots/0_6_0.gif)
 
 Right now, we're in the early stages of Organized, but join us now and watch
 us get better.
@@ -16,23 +16,31 @@ us get better.
   * "*", "-", and "+" characters supported for outlining
   * Support numbered bullets
 * Support todo items
-  * Highlighting of [TODO]/[COMPLETED] tags
-  * Ctrl-Shift-T for toggling todo items from [TODO] to [COMPLETED] to blank.
+  * Highlighting of [TODO]/[DONE] tags
+  * Ctrl-Shift-T for toggling todo items from [TODO] to [DONE] to blank.
+  * Todo items can be marked with a priority of A to E.  This will impact their sorting in the sidebar. (The default
+    level is C if the items aren't marked.)
+  * Highlighting for CLOSED, DEADLINE, and SCHEDULED tags.  DEADLINE and SCHEDULED items will show up in the sidebar.
 * Code blocks
   * Syntax highlighting for code blocks in c, coffeescript, c++, css, golang, html, java,
-    javascript, less, objective c, objective c++, python, php, ruby, shell scripts (generic), and sql.
-  * Execution for coffeescript, javascript, perl, php, python, and shell scripts.  Put your cursor
-    in your code block and press [Ctrl-` x] to execute code.  Output from code will appear
-    in a notification by default, or create resultblock:
-    <pre>
-    \```result
+    javascript, less, objective c, objective c++, python, php, r, ruby, shell scripts (generic), and sql.
+  * Execution for c, c++, coffeescript, golang, java, javascript, objective-c, perl, php, python, r, and shell
+    scripts.  Put your cursor in your code block and press [Ctrl-` x] to execute code.  Output from
+    code will appear in a notification by default, or create resultblock:
+
+    ~~~~
+    ```result
     ```
-    </pre>
+    ~~~~
+
     and the output will appear there.
-  * Early support for code execution in C, C++, Java, and Objective-C.  You cannot set any libraries in
+  * Early support for code execution in C, C++, Java, Golang, R, and Objective-C.  You cannot set any libraries in
     those languages yet, which may reduce their effectively a bit.
   * Results can be displayed as an information popup or as a separate section in
     your notes for future reference.
+* Sidebar
+  * New sidebar shows all the todo files across the .org files in the open projects.  Settings allow you
+    to always check additional projects.  Todos can be closed on jumped to with a single click
 * Integrates with the [tool-bar](https://atom.io/packages/tool-bar) package to get buttons for easy access
   to common actions.
 * Tables
@@ -43,27 +51,40 @@ us get better.
 
 
 # What's New?
-* 0.4.2 (Released 2016-09-01)
-  * Fixed missing file preventing installation
 
-* 0.4.1 (Released 2016-09-01)
-  * Minor toolbar improvements
-    * Toolbar can be disabled through the organized setup, even if you have toolbar installed
-    * Menu item installed to toggle the toolbar, which should raise the visibility that there is a toolbar.
-  * Fix bug which caused 0.4.0 not to install correctly!
-
-* 0.4.0 (Released 2016-08-31)
-  * Support the "tool-bar" package for atom -- if it is installed, organized will have a toolbar with buttons for:
-    * Indent
-    * Unindent
-    * Creating Headings
-    * Bold
-    * Underline
-    * Creating Links
-    * Creating Tables
-    * Create code blocks
-    * Execute code blocks
-    * Create result blocks to display the code blocks
+* 0.6.7 (Released 2017-05-09)
+  * Fixed bug that caused sidebar to be refreshed several times during startup.  This
+    slowed down startup and caused duplicates to show up in the agenda and todo items.
+  * Removed command that was accidentally included and not yet implemented.
+* 0.6.3-0.6.6 (Release 2017-03-23)
+  * Implemented syntax coloring for todo priorities
+  * Todo Items are now sorted according to priority.  (Default priority is "C", range is A-E)
+  * Added keystrokes option-shift-up and option-shift-down to change priority of current item.  These should be
+    alt-shift-up and alt-shift-down on windows.
+  * Priority items in todo items
+  * Added syntax highlighting for deadlines
+  * Added keystrokes (ctrl-i d) to add a deadline.  Existing "insert date" functionality has been remapped to
+    (ctrl-i /)
+  * Deadlines are treated like schedule items (for now) in agendas
+* 0.6.2 (Released 2017-03-22)
+  * Archive used to only archive the current subtree and it ignored selections.  Now it archives the entire selection
+    too, even if it is multiple subtrees.
+  * Even if sidebar is hidden, the toolbar button always said it was enabled.
+  * If there are links inside of an agenda or todo item, render them as hyperlinks
+  * If there is bold or underlined text in an agenda or todo item, render them.
+* 0.6.1 (Released 2017-03-18)
+  * Missed adding some files before I released, re-releasing.  This closes issue #14.
+* 0.6.0 (Released 2017-03-17)
+  * New Agenda sidebar panel
+  * Any item marked with a SCHEDULED tag later than or equal to the
+    start of today will show up in the Agenda Panel of the sidebar.
+  * New archive command (ctrl-i a) which moves the current subtree you are pointing to into a file named
+    <current-filename>_archive.  (For example, for TODO.org, it would be moved to TODO.org_archive)
+  * Archive files are now colored by org-mode as well.
+  * Stop using COMPLETED for todo items.  Instead use DONE.  Existing COMPLETED tags will continue to be colored
+    correctly.
+  * Don't require brackets around TODO items.
+  * Add a setting which asks whether we should use brackets around TODO or DONE by default
 
 Please see the [CHANGELOG.org](https://raw.githubusercontent.com/MattFlower/organized/master/CHANGELOG.org)
 for full details of recent changes.
@@ -71,15 +92,16 @@ for full details of recent changes.
 
 # What Do I Want to Build
 * Complete compatibility with existing org-mode documents
-* Syntax coloring for code blocks
-* Ability to execute code blocks inline
-* Nice looking panes that can show you your todos and agendas across multiple organized documents
+* Syntax coloring for code blocks (Done)
+* Ability to execute code blocks inline (Done)
+* Nice looking panes that can show you your todos and agendas across multiple organized documents (In progress)
 * Export to pdf, html, etc
 
 # Learning the Basics of Organized
 At the most basic level, Organized is an outlining / note taking tool.  You can
 use either of the two major styles to create an outline:
 
+```
     * Level 1
       * One way to express index level 2
         * One way to express index level 3
@@ -87,10 +109,12 @@ use either of the two major styles to create an outline:
     * Level 1
     ** An alternate way to express index level 2
     *** An alternate way to express index level 3
+```
 
 You can also use alternate characters too.  If you use whitespace to establish
 your indent level, you can mix them:
 
+```
     - Level 1
       * Level 2
         - Level 3
@@ -101,34 +125,43 @@ your indent level, you can mix them:
 
     - Level 1
     -* <=== This is not valid
+```
 
 If you feel like you need to add a TODO, press ctrl-shift-t to do it:
 
+```
     * [TODO] Some important task
+```
 
 When you are done with your task, press ctrl-shift-t again to mark it as completed.
 
-    * [COMPLETED] Some task I'm done with
+```
+    * [DONE] Some task I'm done with
+```
 
 If you didn't mean to mark it as a TODO, pressing ctrl-shift-t a final time
 will make it disappear.
 
 You might want to organize your notes a bit.  You can do that with markdown-style headers (a # character, a space, and some text):
 
+```
     # This is a heading
     * Here are some notes
       * More specific notes
 
     ## A subheading
     * With some more notes
+```
 
 If you need to write some source code, you can do that too:
 
+~~~~
     ```java
     public static void main(String[] args) {
       System.out.println("Hello, World");
     }
     ```
+~~~~
 
 # Why Did I Write Organized?
 I designed Organized in response to a personal itch.  I've long been a user
